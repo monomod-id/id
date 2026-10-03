@@ -55,7 +55,7 @@ function clear() { out.innerHTML = ""; }
 async function boot() {
   pyodide = await loadPyodide();
   await pyodide.runPythonAsync(`
-import json, os
+import json
 from datetime import datetime, timezone
 
 PREFIX = "MONOMOD::"
@@ -64,13 +64,13 @@ DIM = 26
 TOKEN_LEN = len(PREFIX) + DIM
 CENTER = "M"
 
-# Хранилище в памяти процесса Python
-STORE = {}       # token -> dict (состояние)
-INDEX = []       # список токенов
+STORE = {}
+INDEX = []
 
 def parse(token):
     if not isinstance(token, str):
         raise ValueError("токен не строка")
+    token = token.strip().upper()
     if len(token) != TOKEN_LEN:
         raise ValueError(f"длина {len(token)}, ожидается {TOKEN_LEN}")
     if not token.startswith(PREFIX):
@@ -107,6 +107,7 @@ def new_state(token):
     }
 
 def enter(token):
+    token = token.strip().upper()
     parse(token)
     if token not in STORE:
         STORE[token] = new_state(token)
@@ -115,11 +116,11 @@ def enter(token):
     return {"created": False, "state": STORE[token]}
 
 def load(token):
+    token = token.strip().upper()
     parse(token)
     return STORE.get(token, new_state(token))
 `);
 
-  // Подтянуть сохранённое из localStorage
   const saved = localStorage.getItem('mm0_store');
   if (saved) {
     pyodide.globals.set('_saved', saved);
@@ -150,6 +151,7 @@ function py_new() {
   clear();
   const t = pyodide.runPython('center_token()');
   log(t, 'ok');
+  document.getElementById('tok').value = t;
   persist();
 }
 
@@ -165,11 +167,8 @@ function py_enter() {
   const tok = document.getElementById('tok').value.trim();
   try {
     pyodide.globals.set('_tok', tok);
-    pyodide.runPython(`
-_res = enter(_tok)
-`);
+    pyodide.runPython('_res = enter(_tok)');
     const created = pyodide.runPython('_res["created"]');
-    const st = pyodide.runPython('_res["state"]');
     const stStr = pyodide.runPython('import json as _j; _j.dumps(_res["state"], ensure_ascii=False, indent=2)');
     log(created ? 'НОВЫЙ ТОКЕН — заход выполнен' : 'токен найден — заход выполнен', 'ok');
     log(stStr);
